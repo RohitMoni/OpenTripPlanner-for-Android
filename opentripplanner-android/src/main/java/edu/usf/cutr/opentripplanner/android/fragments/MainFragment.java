@@ -42,6 +42,7 @@ import android.graphics.Point;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Build;
@@ -197,6 +198,7 @@ public class MainFragment extends Fragment implements
         GoogleMap.OnCameraChangeListener {
 
     private static LocationManager sLocationManager;
+    private LocationListener locationListener;
 
     private OTPApp mOTPApp;
 
@@ -563,6 +565,20 @@ public class MainFragment extends Fragment implements
 
         sLocationManager = (LocationManager) getActivity()
                 .getSystemService(Context.LOCATION_SERVICE);
+
+        locationListener = new LocationListener() {
+            public void onLocationChanged (Location location) {
+                updateLocation(location);
+            }
+            public void onStatusChanged(String provider, int status, Bundle extras) {}
+
+            public void onProviderEnabled(String provider) {}
+
+            public void onProviderDisabled(String provider) {}
+        };
+
+        sLocationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
+
 
         if (savedInstanceState == null) {
             SharedPreferences.Editor prefsEditor = mPrefs.edit();
@@ -3638,10 +3654,8 @@ public class MainFragment extends Fragment implements
             if (mLocationClient.isConnected()) {
                 Location loc = mLocationClient.getLastLocation();
 
-
                 if (loc != null) {
                     LatLng mCurrentLocation = new LatLng(loc.getLatitude(), loc.getLongitude());
-                    notifyUser(mSavedLastLocation, mCurrentLocation);
                     mSavedLastLocation = mCurrentLocation;
                     return mCurrentLocation;
                 }
@@ -3653,6 +3667,24 @@ public class MainFragment extends Fragment implements
         return null;
     }
 
+    public void updateLocation(Location location) {
+        int lat = (int) (location.getLatitude());
+        int lng = (int) (location.getLongitude());
+
+        if (mLocationClient != null) {
+            if (mLocationClient.isConnected()) {
+                Location loc = mLocationClient.getLastLocation();
+
+                if (loc != null) {
+                    LatLng mCurrentLocation = new LatLng(lat, lng);
+                    notifyUser(mSavedLastLocation, mCurrentLocation);
+                    mSavedLastLocation = mCurrentLocation;
+                }
+            }
+        }
+    }
+
+
     /*
      * Called by getLastLocation() (whenever location is updated)
      * Checks to see if the new user location is near a node.
@@ -3661,26 +3693,62 @@ public class MainFragment extends Fragment implements
      */
     public void notifyUser(LatLng oldLoc, LatLng newLoc) {
 
+        List<Leg> currentItinerary = mFragmentListener.getCurrentItinerary();
+        double notifyRadius = 2000;
+
         // Check to see if a trip is currently opened / in progress
-        if (mRoute != null) {
+        if (!currentItinerary.isEmpty()) {
             // If yes:
-            // compare old location data with trip nodes, set bool flags
-            
 
-            // compare new location data with trip nodes, set bool flags
+            double userOldX = oldLoc.longitude;
+            double userOldY = oldLoc.latitude;
+            double userNewX = oldLoc.longitude;
+            double userNewY = oldLoc.latitude;
 
-            // If user is near a trip node that they weren't close to before, vibrate
+            double NodeX, NodeY;
 
-            // (Optional) If trip node is final node, use different vibrate pattern
+            for (Leg entry : currentItinerary) {
+                NodeX = entry.from.getLon();
+                NodeY = entry.from.getLat();
+
+//                if (measure(userOldY, userOldX, NodeY, NodeX) <= notifyRadius)
+//                    continue;
+
+                if (measure(userNewY, userNewX, NodeY, NodeX) <= notifyRadius) {
+                    vibrate();
+                }
+            }
+
+            // If trip node is final node, use different vibrate pattern
+            NodeX = currentItinerary.get(currentItinerary.size() - 1).to.getLon();
+            NodeY = currentItinerary.get(currentItinerary.size() - 1).to.getLat();
+
+//            if (measure(userOldY, userOldX, NodeY, NodeX) <= notifyRadius)
+//                return;
+
+            if (measure(userNewY, userNewX, NodeY, NodeX) <= notifyRadius)
+                vibrate();
         }
+    }
+
+    public double measure(double lat1, double lon1, double lat2, double lon2){  // generally used geo measurement function
+        double R = 6378.137; // Radius of earth in KM
+        double dLat = (lat2 - lat1) * Math.PI / 180;
+        double dLon = (lon2 - lon1) * Math.PI / 180;
+        double a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                        Math.sin(dLon/2) * Math.sin(dLon/2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        double d = R * c;
+        return d * 1000; // meters
     }
 
     /*
      * Call to vibrate function
      */
-    private void vibrateFor() {
-        Vibrator v = (Vibrator) this.context.getSystemService(Context.VIBRATOR_SERVICE);
-        v.vibrate(500);
+    public void vibrate() {
+        Vibrator v = (Vibrator) mApplicationContext.getSystemService(Context.VIBRATOR_SERVICE);
+        v.vibrate(100);
     }
 
     /*
