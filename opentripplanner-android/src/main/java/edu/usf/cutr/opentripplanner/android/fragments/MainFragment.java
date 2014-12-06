@@ -46,6 +46,7 @@ import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Vibrator;
 import android.preference.PreferenceManager;
 import android.provider.ContactsContract;
 import android.provider.Settings;
@@ -3637,8 +3638,10 @@ public class MainFragment extends Fragment implements
             if (mLocationClient.isConnected()) {
                 Location loc = mLocationClient.getLastLocation();
 
+
                 if (loc != null) {
                     LatLng mCurrentLocation = new LatLng(loc.getLatitude(), loc.getLongitude());
+                    notifyUser(mSavedLastLocation, mCurrentLocation);
                     mSavedLastLocation = mCurrentLocation;
                     return mCurrentLocation;
                 }
@@ -3648,6 +3651,36 @@ public class MainFragment extends Fragment implements
             }
         }
         return null;
+    }
+
+    /*
+     * Called by getLastLocation() (whenever location is updated)
+     * Checks to see if the new user location is near a node.
+     * Used to notify a user when they get close to a route node
+     * If yes: vibrates
+     */
+    public void notifyUser(LatLng oldLoc, LatLng newLoc) {
+
+        // Check to see if a trip is currently opened / in progress
+        if (mRoute != null) {
+            // If yes:
+            // compare old location data with trip nodes, set bool flags
+            
+
+            // compare new location data with trip nodes, set bool flags
+
+            // If user is near a trip node that they weren't close to before, vibrate
+
+            // (Optional) If trip node is final node, use different vibrate pattern
+        }
+    }
+
+    /*
+     * Call to vibrate function
+     */
+    private void vibrateFor() {
+        Vibrator v = (Vibrator) this.context.getSystemService(Context.VIBRATOR_SERVICE);
+        v.vibrate(500);
     }
 
     /*

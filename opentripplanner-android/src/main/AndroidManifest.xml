@@ -28,7 +28,7 @@
         android:protectionLevel="signature" />
 
     <!-- Others -->
-    <uses-permission android:name="android.permission.vibrate" />
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="edu.usf.cutr.opentripplanner.android.permission.MAPS_RECEIVE" />
     <uses-permission android:name="com.google.android.providers.gsf.permission.READ_GSERVICES" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
