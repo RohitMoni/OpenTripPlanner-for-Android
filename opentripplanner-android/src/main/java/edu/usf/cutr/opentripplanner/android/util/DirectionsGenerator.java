@@ -127,6 +127,7 @@ public class DirectionsGenerator {
         }
     }
 
+
     private Direction generateNonTransitDirections(Leg leg) {
         Direction direction = new Direction();
 

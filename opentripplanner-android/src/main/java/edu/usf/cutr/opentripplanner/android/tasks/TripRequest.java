@@ -109,12 +109,9 @@ public class TripRequest extends AsyncTask<Request, Integer, Long> {
             return null;
         }
         else{
-            String prefix = PreferenceManager.getDefaultSharedPreferences(context)
-                    .getString(OTPApp.PREFERENCE_KEY_FOLDER_STRUCTURE_PREFIX
-                            , OTPApp.FOLDER_STRUCTURE_PREFIX_NEW);
             String baseURL = selectedServer.getBaseURL();
             for (Request req : reqs) {
-                response = requestPlan(req, prefix, baseURL);
+                response = requestPlan(req, "", baseURL);
             }
         }
         return totalSize;
