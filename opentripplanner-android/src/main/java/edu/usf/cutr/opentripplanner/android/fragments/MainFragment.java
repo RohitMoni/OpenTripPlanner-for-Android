@@ -97,6 +97,7 @@ import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesClient;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.location.LocationClient;
+import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.GoogleMap.OnInfoWindowClickListener;
@@ -138,6 +139,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -359,6 +361,8 @@ public class MainFragment extends Fragment implements
     private GraphMetadata mCustomServerMetadata = null;
 
     private OTPGeocoding mGeoCodingTask;
+
+    private int currentMarker = 0;
 
     @SuppressWarnings("deprecation")
     @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
@@ -3089,6 +3093,17 @@ public class MainFragment extends Fragment implements
                 }
             }
         }
+    }
+
+    private void SelectNextMarker()
+    {
+        LatLngBounds.Builder boundsCreator = LatLngBounds.builder();
+
+        LatLngBounds routeBounds = boundsCreator.build();
+
+        Marker[] markers = (Marker[])mModeMarkers.keySet().toArray();
+
+        showRouteOnMapAnimateCamera(routeBounds, markers[currentMarker], 1);
     }
 
     private MarkerOptions generateModeMarkerOptions(Leg leg, LatLng location, int stepIndex){
