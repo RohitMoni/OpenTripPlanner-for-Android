@@ -98,8 +98,9 @@ import android.widget.Toast;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesClient;
 import com.google.android.gms.common.GooglePlayServicesUtil;
+import com.google.android.gms.games.leaderboard.OnLeaderboardMetadataLoadedListener;
 import com.google.android.gms.location.LocationClient;
-import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.GoogleMap.OnInfoWindowClickListener;
@@ -200,13 +201,13 @@ public class MainFragment extends Fragment implements
         GoogleMap.OnCameraChangeListener {
 
     private static LocationManager sLocationManager;
-    private LocationListener locationListener;
 
     private OTPApp mOTPApp;
 
     private Context mApplicationContext;
 
     private LocationClient mLocationClient;
+    private LocationRequest mLocationRequest;
 
     private OtpFragment mFragmentListener;
 
@@ -306,6 +307,7 @@ public class MainFragment extends Fragment implements
     private boolean mIsEndLocationChangedByUser = true;
 
     private Map<Marker, TripInfo> mModeMarkers;
+    private Map<Leg, Marker> mModeMarkerLegs;
 
     private List<Polyline> mRoute;
 
@@ -366,6 +368,8 @@ public class MainFragment extends Fragment implements
     private OTPGeocoding mGeoCodingTask;
 
     private int currentMarker = 0;
+
+    public LatLngBounds mRouteBounds = null;
 
     @SuppressWarnings("deprecation")
     @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
@@ -570,18 +574,7 @@ public class MainFragment extends Fragment implements
         sLocationManager = (LocationManager) getActivity()
                 .getSystemService(Context.LOCATION_SERVICE);
 
-        locationListener = new LocationListener() {
-            public void onLocationChanged (Location location) {
-                updateLocation(location);
-            }
-            public void onStatusChanged(String provider, int status, Bundle extras) {}
-
-            public void onProviderEnabled(String provider) {}
-
-            public void onProviderDisabled(String provider) {}
-        };
-
-        sLocationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
+        //sLocationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
 
 
         if (savedInstanceState == null) {
@@ -2429,6 +2422,15 @@ public class MainFragment extends Fragment implements
     public void onStart() {
         super.onStart();
 
+        mLocationRequest = LocationRequest.create();
+        mLocationRequest.setPriority(
+                LocationRequest.PRIORITY_HIGH_ACCURACY);
+        // Set the update interval to 5 seconds
+        mLocationRequest.setInterval(5000);
+        // Set the fastest update interval to 1 second
+        mLocationRequest.setFastestInterval(1000);
+
+
         mLocationClient = new LocationClient(mApplicationContext, this, this);
 
         if (mMapFailed) {
@@ -3046,8 +3048,10 @@ public class MainFragment extends Fragment implements
                 entry.getKey().remove();
             }
         }
+
         mRoute = new ArrayList<Polyline>();
         mModeMarkers = new HashMap<Marker, TripInfo>();
+        mModeMarkerLegs = new HashMap<Leg, Marker>();
         Marker firstTransitMarker = null;
 
         if (!itinerary.isEmpty() && !mMapFailed) {
@@ -3076,6 +3080,7 @@ public class MainFragment extends Fragment implements
                     TripInfo tripInfo = new TripInfo(realtime, leg.tripId,
                             generateModeMarkerSnippet(leg), leg.departureDelay);
                     mModeMarkers.put(modeMarker, tripInfo);
+                    mModeMarkerLegs.put(leg, modeMarker);
 
                     if (TraverseMode.valueOf(leg.mode).isTransit()) {
                         //because on transit two step-by-step indications are generated (get on / get off)
@@ -3107,20 +3112,19 @@ public class MainFragment extends Fragment implements
                 if (((SupportMapFragment) getFragmentManager().findFragmentById(R.id.map)).getMap()
                         != null){
                     showRouteOnMapAnimateCamera(routeBounds, firstTransitMarker, animateCamera);
+
+                    mRouteBounds = routeBounds;
                 }
             }
         }
     }
 
-    private void SelectNextMarker()
+    private void SelectMarker(Leg leg)
     {
-        LatLngBounds.Builder boundsCreator = LatLngBounds.builder();
+        Marker marker = mModeMarkerLegs.get(leg);
 
-        LatLngBounds routeBounds = boundsCreator.build();
-
-        Marker[] markers = (Marker[])mModeMarkers.keySet().toArray();
-
-        showRouteOnMapAnimateCamera(routeBounds, markers[currentMarker], 1);
+        showRouteOnMapAnimateCamera(mRouteBounds, marker, 1);
+        marker.showInfoWindow();
     }
 
     private MarkerOptions generateModeMarkerOptions(Leg leg, LatLng location, int stepIndex){
@@ -3683,17 +3687,14 @@ public class MainFragment extends Fragment implements
     }
 
     public void updateLocation(Location location) {
-        int lat = (int) (location.getLatitude());
-        int lng = (int) (location.getLongitude());
 
         if (mLocationClient != null) {
             if (mLocationClient.isConnected()) {
                 Location loc = mLocationClient.getLastLocation();
 
                 if (loc != null) {
-                    LatLng mCurrentLocation = new LatLng(lat, lng);
+                    LatLng mCurrentLocation = new LatLng(location.getLatitude(), location.getLongitude());
                     notifyUser(mSavedLastLocation, mCurrentLocation);
-                    mSavedLastLocation = mCurrentLocation;
                 }
             }
         }
@@ -3703,13 +3704,15 @@ public class MainFragment extends Fragment implements
     /*
      * Called by getLastLocation() (whenever location is updated)
      * Checks to see if the new user location is near a node.
-     * Used to notify a user when they get close to a route node
+     * Used to notify ga user when they get close to a route node
      * If yes: vibrates
      */
     public void notifyUser(LatLng oldLoc, LatLng newLoc) {
 
         List<Leg> currentItinerary = mFragmentListener.getCurrentItinerary();
-        double notifyRadius = 2000;
+        double notifyRadius = 125;
+
+        double dNotifyRadius = 0.01f;
 
         // Check to see if a trip is currently opened / in progress
         if (!currentItinerary.isEmpty()) {
@@ -3717,22 +3720,34 @@ public class MainFragment extends Fragment implements
 
             double userOldX = oldLoc.longitude;
             double userOldY = oldLoc.latitude;
-            double userNewX = oldLoc.longitude;
-            double userNewY = oldLoc.latitude;
+            double userNewX = newLoc.longitude;
+            double userNewY = newLoc.latitude;
 
             double NodeX, NodeY;
+
+            int index = 0;
 
             for (Leg entry : currentItinerary) {
                 NodeX = entry.from.getLon();
                 NodeY = entry.from.getLat();
+
+                double netX = Math.abs(NodeX - userNewX);
+                double netY = Math.abs(NodeY - userNewY);
+
+                Toast toast = Toast.makeText(this.getActivity(), String.valueOf(measure(userNewY, userNewX, NodeY, NodeX)), Toast.LENGTH_SHORT);
+                toast.show();
 
 //                if (measure(userOldY, userOldX, NodeY, NodeX) <= notifyRadius)
 //                    continue;
 
                 if (measure(userNewY, userNewX, NodeY, NodeX) <= notifyRadius) {
                     vibrate();
+                    SelectMarker(entry);
                 }
+
+                index++;
             }
+
 
             // If trip node is final node, use different vibrate pattern
             NodeX = currentItinerary.get(currentItinerary.size() - 1).to.getLon();
@@ -3741,8 +3756,12 @@ public class MainFragment extends Fragment implements
 //            if (measure(userOldY, userOldX, NodeY, NodeX) <= notifyRadius)
 //                return;
 
-            if (measure(userNewY, userNewX, NodeY, NodeX) <= notifyRadius)
-                vibrate();
+           // if (measure(userNewY, userNewX, NodeY, NodeX) <= notifyRadius) {
+            //    vibrate();
+
+            //    SelectMarker(currentItinerary.get(currentItinerary.size() - 1));
+           // }
+
         }
     }
 
@@ -3763,7 +3782,7 @@ public class MainFragment extends Fragment implements
      */
     public void vibrate() {
         Vibrator v = (Vibrator) mApplicationContext.getSystemService(Context.VIBRATOR_SERVICE);
-        v.vibrate(100);
+        v.vibrate(1000);
     }
 
     /*
@@ -3816,6 +3835,14 @@ public class MainFragment extends Fragment implements
 
         if ((!mMapFailed)) {
             if (mCurrentLocation != null) {
+
+                mLocationClient.requestLocationUpdates(mLocationRequest, new com.google.android.gms.location.LocationListener() {
+                    @Override
+                    public void onLocationChanged(Location location) {
+                        updateLocation(location);
+                    }
+                });
+
                 double savedLatitude = 0;
                 double savedLongitude = 0;
                 float distance[] = new float[1];

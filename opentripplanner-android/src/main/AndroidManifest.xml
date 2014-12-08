@@ -37,6 +37,7 @@
     <!-- The following permission is not required to use
          Google Maps Android API v2, but is recommended. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
 
     <uses-feature
         android:glEsVersion="0x00020000"
@@ -79,7 +80,7 @@
 
         <meta-data
             android:name="com.google.android.maps.v2.API_KEY"
-            android:value="AIzaSyD5XadJhAK7jIKFz5TcT7t-gsWw_OTvlBI" />
+            android:value="AIzaSyBbfHlPQA3H3zH2pLSbAVuV95XuvYOkAoQ" />
     </application>
 
 
